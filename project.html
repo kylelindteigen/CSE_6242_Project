@@ -293,8 +293,8 @@ margin: 0 0 5px; color: #777;
   var houseMin = 0
   var houseMax = 0
   var jselected = false
-  var xlable = "Year"
-  var ylable = "Population"
+  var xlabel = "Year"
+  var ylabel = "Population"
   var title = "US States Population Over Time"
   var minS = 0
   var minY = 0
@@ -557,6 +557,8 @@ margin: 0 0 5px; color: #777;
       d3.select("#graph").select("svg").remove()
       dropDownDate.selectAll("option").remove()
       if(dropDownData.property('value') == "Population"){
+        title = "US Population by State"
+        ylabel = "Population"
         hov.text("US Population by State")
         jselected = false
         var dates = Object.keys(popData)
@@ -565,6 +567,8 @@ margin: 0 0 5px; color: #777;
         addLine(stateDataPop, popMax, popMin);
       }
       else if(dropDownData.property('value') == "Temperature"){
+        title = "US Temperature by State"
+        ylabel = "Temperature"
         hov.text("US Temperature by State")
         jselected = false
         var dates = Object.keys(tempData)
@@ -573,6 +577,8 @@ margin: 0 0 5px; color: #777;
         addLine(stateDataTemp, tempMax, tempMin);
       }
       else if(dropDownData.property('value') == "Housing Price Index"){
+        title = "US Housing Price Index by State"
+        ylabel = "Housing Price Index"
         hov.text("US Housing Price Index by State")
         jselected = true
         var dates = Object.keys(houseData)
@@ -590,6 +596,8 @@ margin: 0 0 5px; color: #777;
         createMapAndLegend(us, accidentData[dropDownDate.property('value')], stateDataHouse, maxY, minY)
       }
       else{
+        title = "US Jobs Added by State"
+        ylabel = "Jobs Added"
         hov.text("US Jobs Added by State")
         jselected = true
         var dates = Object.keys(jobsData)
@@ -870,6 +878,23 @@ function addLine(stateData, maxData, minData){
   }
   svg.append("g").attr("id", 'x_axis').attr("transform", "translate(0," + (height - mbottom) + ")").call(xAxis)
   svg.append("g").attr("transform", "translate(" + margin + ",0)").attr("id", "y_axis").call(yAxis)
+  svg.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 30)
+      .attr("x",0 - (height / 2))
+      .attr("dy", "1em")
+      .style("text-anchor", "middle")
+      .text(ylabel);
+  svg.append("text")
+          .attr("y", height)
+          .attr("x",width/2)
+          .style("text-anchor", "middle")
+          .text(xlabel);
+  svg.append("text")
+        .attr("y", 10)
+        .attr("x",width/2)
+        .style("text-anchor", "middle")
+        .text(title);
 
 }
 
