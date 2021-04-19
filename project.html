@@ -222,7 +222,7 @@ margin: 0 0 5px; color: #777;
 <label>Select Data Set</label>
 <select id="data" name="data">
 </select>
-<label>Select Time Period</label>
+<label id = "labT">Select Time Period</label>
 <select id="date" name="date">
 </select>
 </div>
@@ -253,19 +253,6 @@ margin: 0 0 5px; color: #777;
 
   var colorScheme = d3.scaleOrdinal(colorArray[0]);
 
-  // var svg = d3.select("#choropleth").select("svg"),
-  //     width = +svg.attr("width"),
-  //     height = +svg.attr("height");
-
-  // var path = d3.geoPath();
-
-  // var unemployment = d3.map();
-  //
-  // var xgraph = d3.scaleLinear()
-  //     .range([0, width]);
-  //
-  // var x = d3.scaleLinear()
-  //     .rangeRound([10, 870]);
   var map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/light-v9',
@@ -283,16 +270,20 @@ margin: 0 0 5px; color: #777;
   var hov = d3.select("#hov")
   var hovS = d3.select("#hovS")
   var hovN = d3.select("#hovN")
+  var labT = d3.select("#labT")
   var tip = d3.tip()
   var stateDataPop = {}
   var stateDataTemp = {}
   var stateDataJobs = {}
   var stateDataHouse = {}
+  var stateDataAccident = {}
   var stateSelected = {}
   var popData = {}
   var tempData = {}
   var jobsData = {}
   var houseData = {}
+  var accidentData = {}
+  var accidentSelected = false
   var popMin = 0
   var popMax = 0
   var tempMin = 0
@@ -305,6 +296,10 @@ margin: 0 0 5px; color: #777;
   var xlable = "Year"
   var ylable = "Population"
   var title = "US States Population Over Time"
+  var minS = 0
+  var minY = 0
+  var maxS = 0
+  var maxY = 0
 
   Promise.all([
       // enter code to read files
@@ -313,7 +308,9 @@ margin: 0 0 5px; color: #777;
       d3.tsv("us-state-names.tsv"),
       d3.csv("temp_proj.csv"),
       d3.csv("jobForecast.csv"),
-      d3.csv("HousingData.csv")
+      d3.csv("HousingData.csv"),
+      d3.csv("Accidents_Stats.csv"),
+      d3.csv("Accidents_varImp.csv")
   ]).then((values) =>{
     // enter code to call ready() with required arguments
 
@@ -444,8 +441,38 @@ margin: 0 0 5px; color: #777;
         }
       }
     }
+    accidentData["Average Yearly"] = {}
+    accidentData["Average Severity"] = {}
+    minS = values[6][1]["Ave_Severity"]
+    minY = values[6][1]["Ave_Yrly_Acc"]
+    for(i in values[6]){
+      if(convertN_FIP[values[6][i]["State"]] != undefined && parseInt(values[6][i]["Ave_Yrly_Acc"]) != NaN){
+        accidentData["Average Yearly"][convertN_FIP[values[6][i]["State"]]] = parseInt(values[6][i]["Ave_Yrly_Acc"])
+        accidentData["Average Severity"][convertN_FIP[values[6][i]["State"]]] = parseFloat(values[6][i]["Ave_Severity"])
+        if(values[6][i]["Ave_Yrly_Acc"]>maxY){
+          maxY = parseInt(values[6][i]["Ave_Yrly_Acc"])
+        }
+        if(values[6][i]["Ave_Yrly_Acc"]<minY){
+          minY = parseInt(values[6][i]["Ave_Yrly_Acc"])
+        }
+        if(values[6][i]["Ave_Severity"]>maxS){
+          maxS = parseFloat(values[6][i]["Ave_Severity"])
+        }
+        if(values[6][i]["Ave_Severity"]<minS){
+          minS = parseFloat(values[6][i]["Ave_Severity"])
+        }
 
-
+      }
+    }
+    delete accidentData["Average Yearly"][NaN]
+    delete accidentData["Average Severity"][NaN]
+    for(i in values[7]){
+      if(stateDataAccident[convertN_FIP[values[7][i]["State"]]] == undefined){
+        stateDataAccident[convertN_FIP[values[7][i]["State"]]] = {}
+      }
+      stateDataAccident[convertN_FIP[values[7][i]["State"]]][values[7][i]["Pred"]] = values[7][i]["MeanDecreaseAccuracy"]
+    }
+    console.log(stateDataAccident)
 
     values[1].map(function(d){
       for(i in d){
@@ -494,7 +521,9 @@ margin: 0 0 5px; color: #777;
     dropDownData.append("option").text("Temperature").attr("value", "Temperature")
     dropDownData.append("option").text("Jobs Added in State in Next Four Quarters").attr("value", "Jobs Added in State in Next Four Quarters")
     dropDownData.append("option").text("Housing Price Index").attr("value", "Housing Price Index")
+    dropDownData.append("option").text("Accident Statistics").attr("value", "Accident Statistics")
     dropDownDate.on('change', function(){
+      accidentSelected = false
       for(i in stateSelected){
         stateSelected[i] = false
       }
@@ -510,12 +539,18 @@ margin: 0 0 5px; color: #777;
         addLine(stateDataHouse, houseMax, houseMin);
         createMapAndLegend(us, houseData[dropDownDate.property('value')], stateDataHouse, houseMax, houseMin);
       }
+      else if(dropDownData.property('value') == "Accident Statistics"){
+        accidentSelected = true
+        createMapAndLegend(us, accidentData[dropDownDate.property('value')], stateDataHouse, houseMax, houseMin);
+      }
       else{
         addLine(stateDataJobs, jobsMax, jobsMin);
         createMapAndLegend(us, jobsData[dropDownDate.property('value')], stateDataJobs, jobsMax, jobsMin);
       }
     })
     dropDownData.on('change', function(){
+      labT.text("Select Time Period")
+      accidentSelected = false
       for(i in stateSelected){
         stateSelected[i] = false
       }
@@ -544,6 +579,15 @@ margin: 0 0 5px; color: #777;
         dropDownDate.selectAll("option").data(dates).enter().append("option").text(function(d){return d;}).attr("value", function(d){return d;})
         createMapAndLegend(us, houseData[dropDownDate.property('value')], stateDataHouse, houseMax, houseMin)
         addLine(stateDataHouse, houseMax, houseMin);
+      }
+      else if(dropDownData.property('value') == "Accident Statistics"){
+        accidentSelected = true
+        hov.text("US Yearly Accidents Stats by State")
+        labT.text("Select Accident Statistic")
+        jselected = true
+        var dates = Object.keys(accidentData)
+        dropDownDate.selectAll("option").data(dates).enter().append("option").text(function(d){return d;}).attr("value", function(d){return d;})
+        createMapAndLegend(us, accidentData[dropDownDate.property('value')], stateDataHouse, maxY, minY)
       }
       else{
         hov.text("US Jobs Added by State")
@@ -625,7 +669,6 @@ function continuous(selector_id, colorscale) {
 };
 
 function createMapAndLegend(us, data, stateData, maxData, minData){
-  console.log(stateSelected)
 
   map.remove()
   map = new mapboxgl.Map({
@@ -635,10 +678,10 @@ function createMapAndLegend(us, data, stateData, maxData, minData){
     zoom: 3
     });
     //
-
+    console.log(data)
     var min = Math.min.apply(null, Object.keys(data).map(function(x) { return data[x]}))
     var max = Math.max.apply(null, Object.keys(data).map(function(x) { return data[x]}))
-
+    console.log(min,max)
     var cScale = d3.scaleSequential(d3.interpolateBlues)
       .domain([min, max])
     continuous("#scale", cScale)
@@ -663,14 +706,13 @@ function createMapAndLegend(us, data, stateData, maxData, minData){
         matchExpression.push(i, cScale(d[i]))
       }
       matchExpression.push('#ccc');
-      console.log(matchExpression)
       map.addLayer({
           'id': "states-join",
           'type': 'fill',
           'source': "states", // reference the data source
           'layout': {},
           'paint': {
-          'fill-color': matchExpression, // blue color fill
+          'fill-color': matchExpression
         }
       });
       map.addLayer({
@@ -700,59 +742,68 @@ function createMapAndLegend(us, data, stateData, maxData, minData){
         3,
         1
         ]
-        ]
+      ]
       }
       });
       map.on('mousemove', 'states-join', function (e) {
-      if (e.features.length > 0) {
-      if (hoveredStateId !== null) {
-      map.setFeatureState(
-      { source: 'states', id: hoveredStateId },
-      { hover: false }
-      );
-      }
-      hovS.text(convertFIP_N[e.features[0].id] + ":")
-      hovN.text(e.features[0].properties.value)
-      hoveredStateId = e.features[0].id;
-      map.setFeatureState(
-      { source: 'states', id: hoveredStateId },
-      { hover: true }
-      );
-      }
+        if (e.features.length > 0) {
+          if (hoveredStateId !== null) {
+            map.setFeatureState(
+            { source: 'states', id: hoveredStateId },
+            { hover: false }
+            );
+          }
+        hovS.text(convertFIP_N[e.features[0].id] + ":")
+        hovN.text(e.features[0].properties.value)
+        hoveredStateId = e.features[0].id;
+        map.setFeatureState(
+          { source: 'states', id: hoveredStateId },
+          { hover: true }
+        );
+        if(accidentSelected){
+
+        }
+        }
       });
 
       // When the mouse leaves the state-fill layer, update the feature state of the
       // previously hovered feature.
       map.on('mouseleave', 'states-join', function () {
-      if (hoveredStateId !== null) {
-      map.setFeatureState(
-      { source: 'states', id: hoveredStateId },
-      { hover: false }
-      );
-      }
-      hovS.text("")
-      hovN.text("")
-      hoveredStateId = null;
+        if (hoveredStateId !== null) {
+        map.setFeatureState(
+          { source: 'states', id: hoveredStateId },
+          { hover: false }
+          );
+        }
+        hovS.text("")
+        hovN.text("")
+        hoveredStateId = null;
+        if(accidentSelected){
+
+        }
       });
 
       map.on('click', 'states-join', function (e) {
-        if(e.features[0]["state"]["click"]){
-          map.setFeatureState(
-          { source: 'states', id: e.features[0].id },
-          { click: false }
-          );
-          stateSelected[parseInt(e.features[0].id)] = false
-          addLine(stateData, maxData, minData)
-        }
-        else{
-          map.setFeatureState(
-          { source: 'states', id: e.features[0].id },
-          { click: true }
-          );
-          stateSelected[parseInt(e.features[0].id)] = true
-          addLine(stateData, maxData, minData)
+        if(!accidentSelected){
+          if(e.features[0]["state"]["click"]){
+            map.setFeatureState(
+            { source: 'states', id: e.features[0].id },
+            { click: false }
+            );
+            stateSelected[parseInt(e.features[0].id)] = false
+            addLine(stateData, maxData, minData)
+          }
+          else{
+            map.setFeatureState(
+            { source: 'states', id: e.features[0].id },
+            { click: true }
+            );
+            stateSelected[parseInt(e.features[0].id)] = true
+            addLine(stateData, maxData, minData)
+          }
         }
       });
+
 })
 }
 
