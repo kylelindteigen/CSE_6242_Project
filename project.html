@@ -723,7 +723,7 @@ function continuous(selector_id, colorscale) {
 };
 
 function createMapAndLegend(us, data, stateData, maxData, minData){
-
+  var hovStateIdTemp = 0
   map.remove()
 
   for(i in statesData["features"]){
@@ -819,7 +819,8 @@ function createMapAndLegend(us, data, stateData, maxData, minData){
           { source: 'states', id: hoveredStateId },
           { hover: true }
         );
-        if(accidentSelected && e.features[0]["properties"]["value"] != undefined){
+        if(accidentSelected && e.features[0]["properties"]["value"] != undefined && hoveredStateId != hovStateIdTemp){
+          hovStateIdTemp = e.features[0].id
           addBar(stateDataAccident[e.features[0].id])
         }
         }
