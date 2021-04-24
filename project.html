@@ -275,12 +275,14 @@ margin: 0 0 5px; color: #777;
   var stateDataJobs = {}
   var stateDataHouse = {}
   var stateDataAccident = {}
+  var stateDataIncome = {}
   var stateSelected = {}
   var popData = {}
   var tempData = {}
   var jobsData = {}
   var houseData = {}
   var accidentData = {}
+  var incomeData = {}
   var accidentSelected = false
   var popMin = 0
   var popMax = 0
@@ -290,6 +292,8 @@ margin: 0 0 5px; color: #777;
   var jobsMax = 0
   var houseMin = 0
   var houseMax = 0
+  var incomeMin = 0
+  var incomeMax = 0
   var jselected = false
   var xlabel = "Year"
   var ylabel = "Population"
@@ -308,7 +312,8 @@ margin: 0 0 5px; color: #777;
       d3.csv("jobForecast.csv"),
       d3.csv("HousingData.csv"),
       d3.csv("Accidents_Stats.csv"),
-      d3.csv("Accidents_varImp.csv")
+      d3.csv("Accidents_varImp.csv"),
+      d3.csv("income_proj.csv")
   ]).then((values) =>{
     // enter code to call ready() with required arguments
 
@@ -354,6 +359,27 @@ margin: 0 0 5px; color: #777;
             }
             if(parseFloat(values[3][i][keys[j]]) < tempMin){
               tempMin = parseFloat(values[3][i][keys[j]])
+            }
+          }
+        }
+      }
+    }
+
+    keys = Object.keys(values[8][1])
+    for(i in keys){
+      stateDataIncome[convertN_FIP[keys[i]]] = []
+    }
+
+    for(i in values[8]){
+      if(i != "columns"){
+        for(j in keys){
+          stateDataIncome[convertN_FIP[keys[j]]].push(parseFloat(values[8][i][keys[j]]))////////////////////////////////////////////////////////////////////////
+          if(keys[j] != "Year"){
+            if(parseFloat(values[8][i][keys[j]]) > incomeMax){
+              incomeMax = parseFloat(values[8][i][keys[j]])
+            }
+            if(parseFloat(values[3][i][keys[j]]) < incomeMin){
+              incomeMin = parseFloat(values[8][i][keys[j]])
             }
           }
         }
@@ -470,7 +496,8 @@ margin: 0 0 5px; color: #777;
       }
       stateDataAccident[convertN_FIP[values[7][i]["State"]]][values[7][i]["Pred"]] = values[7][i]["MeanDecreaseAccuracy"]
     }
-    console.log(stateDataAccident)
+
+
 
     values[1].map(function(d){
       for(i in d){
@@ -506,10 +533,22 @@ margin: 0 0 5px; color: #777;
       }
       return d;
     })
+    values[8].map(function(d){
+      for(i in d){
+        if(i == "Year"){
+          incomeData[d["Year"]] = {}
+        }
+        else{
+          incomeData[d["Year"]][convertN_FIP[i]] = parseInt(d[i])
+        }
+      }
+      return d;
+    })
 
 
     ready("error", values[0], values[2])
   });
+
 
 
   function ready(error, us, usnames) {
@@ -517,9 +556,10 @@ margin: 0 0 5px; color: #777;
     dropDownDate.selectAll("option").data(dates).enter().append("option").text(function(d){return d;}).attr("value", function(d){return d;})
     dropDownData.append("option").text("Population").attr("value", "Population")
     dropDownData.append("option").text("Temperature").attr("value", "Temperature")
-    dropDownData.append("option").text("Jobs Added in State in Next Four Quarters").attr("value", "Jobs Added in State in Next Four Quarters")
+    dropDownData.append("option").text("Jobs Added in State Over Quarter").attr("value", "Jobs Added in State Over Quarter")
     dropDownData.append("option").text("Housing Price Index").attr("value", "Housing Price Index")
     dropDownData.append("option").text("Accident Statistics").attr("value", "Accident Statistics")
+    dropDownData.append("option").text("Income").attr("value", "Income")
     dropDownDate.on('change', function(){
       accidentSelected = false
       for(i in stateSelected){
@@ -540,6 +580,10 @@ margin: 0 0 5px; color: #777;
       else if(dropDownData.property('value') == "Accident Statistics"){
         accidentSelected = true
         createMapAndLegend(us, accidentData[dropDownDate.property('value')], stateDataHouse, houseMax, houseMin);
+      }
+      else if(dropDownData.property('value') == "Income"){
+        addLine(stateDataIncome, incomeMax, incomeMin);
+        createMapAndLegend(us, incomeData[dropDownDate.property('value')], stateDataIncome, incomeMax, incomeMin);
       }
       else{
         addLine(stateDataJobs, jobsMax, jobsMin);
@@ -586,12 +630,24 @@ margin: 0 0 5px; color: #777;
       }
       else if(dropDownData.property('value') == "Accident Statistics"){
         accidentSelected = true
+        title = "Accident Data Feature Importance"
+        ylabel = "Feature Importance"
         hov.text("US Yearly Accidents Stats by State")
         labT.text("Select Accident Statistic")
         jselected = true
         var dates = Object.keys(accidentData)
         dropDownDate.selectAll("option").data(dates).enter().append("option").text(function(d){return d;}).attr("value", function(d){return d;})
         createMapAndLegend(us, accidentData[dropDownDate.property('value')], stateDataHouse, maxY, minY)
+      }
+      else if(dropDownData.property('value') == "Income"){
+        title = "US Average Income by State"
+        ylabel = "Income"
+        hov.text("US Average Income by State")
+        jselected = false
+        var dates = Object.keys(incomeData)
+        dropDownDate.selectAll("option").data(dates).enter().append("option").text(function(d){return d;}).attr("value", function(d){return d;})
+        createMapAndLegend(us, incomeData[dropDownDate.property('value')], stateDataIncome, incomeMax, incomeMin)
+        addLine(stateDataIncome, incomeMax, incomeMin);
       }
       else{
         title = "US Jobs Added by State"
@@ -633,7 +689,7 @@ function continuous(selector_id, colorscale) {
     .range([1, legendheight - margin.top - margin.bottom])
     .domain(colorscale.domain());
 
-  // image data hackery based on http://bl.ocks.org/mbostock/048d21cf747371b11884f75ad896e5a5
+
   var image = ctx.createImageData(1, legendheight);
   d3.range(legendheight).forEach(function(i) {
     var c = d3.rgb(colorscale(legendscale.invert(i)));
@@ -644,14 +700,6 @@ function continuous(selector_id, colorscale) {
   });
   ctx.putImageData(image, 0, 0);
 
-  // A simpler way to do the above, but possibly slower. keep in mind the legend width is stretched because the width attr of the canvas is 1
-  // See http://stackoverflow.com/questions/4899799/whats-the-best-way-to-set-a-single-pixel-in-an-html5-canvas
-  /*
-  d3.range(legendheight).forEach(function(i) {
-    ctx.fillStyle = colorscale(legendscale.invert(i));
-    ctx.fillRect(0,i,1,1);
-  });
-  */
 
   var legendaxis = d3.axisRight()
     .scale(legendscale)
@@ -677,6 +725,11 @@ function continuous(selector_id, colorscale) {
 function createMapAndLegend(us, data, stateData, maxData, minData){
 
   map.remove()
+
+  for(i in statesData["features"]){
+    statesData["features"][i]["properties"]["value"] = undefined
+  }
+
   map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/light-v9',
@@ -684,10 +737,10 @@ function createMapAndLegend(us, data, stateData, maxData, minData){
     zoom: 3
     });
     //
-    console.log(data)
+
     var min = Math.min.apply(null, Object.keys(data).map(function(x) { return data[x]}))
     var max = Math.max.apply(null, Object.keys(data).map(function(x) { return data[x]}))
-    console.log(min,max)
+
     var cScale = d3.scaleSequential(d3.interpolateBlues)
       .domain([min, max])
     continuous("#scale", cScale)
@@ -766,8 +819,8 @@ function createMapAndLegend(us, data, stateData, maxData, minData){
           { source: 'states', id: hoveredStateId },
           { hover: true }
         );
-        if(accidentSelected){
-
+        if(accidentSelected && e.features[0]["properties"]["value"] != undefined){
+          addBar(stateDataAccident[e.features[0].id])
         }
         }
       });
@@ -785,7 +838,7 @@ function createMapAndLegend(us, data, stateData, maxData, minData){
         hovN.text("")
         hoveredStateId = null;
         if(accidentSelected){
-
+          d3.select("#graph").select("svg").remove()
         }
       });
 
@@ -799,7 +852,7 @@ function createMapAndLegend(us, data, stateData, maxData, minData){
             stateSelected[parseInt(e.features[0].id)] = false
             addLine(stateData, maxData, minData)
           }
-          else{
+          else if(e.features[0]["properties"]["value"] != undefined){
             map.setFeatureState(
             { source: 'states', id: e.features[0].id },
             { click: true }
@@ -814,6 +867,7 @@ function createMapAndLegend(us, data, stateData, maxData, minData){
 }
 
 function addLine(stateData, maxData, minData){
+
   var t = false
   var states = {}
   for(i in stateSelected){
@@ -894,6 +948,88 @@ function addLine(stateData, maxData, minData){
         .style("text-anchor", "middle")
         .text(title);
 
+}
+
+function addBar(stateData){
+  var keys = []
+  var vals = []
+  var temp = 0
+  var temp2 = 0
+  var temp3 = 0
+  var temp4 = 0
+  for(i in stateData){
+    temp = parseFloat(stateData[i])
+    temp2 = 0
+    temp3 = i
+    temp4 = ""
+    if(vals.length < 5){
+        if(vals.length == 0){
+          vals.push(temp)
+          keys.push(temp3)
+        }
+        else{
+          for(j in keys){
+            if(vals[j]<temp){
+              temp2 = vals[j]
+              vals[j] = temp
+              temp = temp2
+              temp4 = keys[j]
+              keys[j] = temp3
+              temp3 = temp4
+            }
+          }
+          vals.push(temp)
+          keys.push(temp3)
+        }
+    }
+    else{
+      for(j in vals){
+        if(vals[j]<temp){
+          temp2 = vals[j]
+          vals[j] = temp
+          temp = temp2
+          temp4 = keys[j]
+          keys[j] = temp3
+          temp3 = temp4
+        }
+      }
+    }
+  }
+  d3.select("#graph").select("svg").remove()
+
+  var height = 400;
+  var width = 700;
+  var margin = 120;
+  svg2 = d3.select("#graph").append("svg")
+  svg2.attr("width", width).attr("height", height)
+
+  var x2 = d3.scaleLinear().range([margin,width-margin]).domain([0,vals[0]]);
+  var y2 = d3.scaleBand().range([height-margin,margin]).padding(0.1).domain(keys);
+  var xAxis2 = d3.axisBottom().scale(x2).tickSize(-(height-(margin*2)))
+  var yAxis2 = d3.axisLeft().scale(y2)
+  svg2.selectAll(".bar")
+  .data(vals)
+  .enter().append("rect")
+    .attr("class", "bar")
+    .attr("width", function(d) {return x2(d) - margin; } )
+    .attr("y", function(d,i) { return y2(keys[i]); })
+    .attr("height", y2.bandwidth()).attr("transform", "translate(" + (margin) + ",0)")
+    .attr("style", "fill: rgba(0,0,255, 0.2)");
+  svg2.append("g")
+    .attr("transform", "translate(0," + (height-margin) + ")")
+    .call(xAxis2);
+  svg2.append("g")
+    .attr("transform", "translate(" + (margin) + ",0)")
+    .call(yAxis2);
+  svg2.append("text").attr("id", "x_axis_label").attr("transform", "translate("+((width)/2)+","+(height-(margin/2)-5) +")").style("text-anchor", "middle").text("Importance")
+
+  svg2.append("text").attr("id", "y_axis_label").attr("transform", "rotate(-90)")
+    .attr("y", 0)
+    .attr("x", 0-height/2)
+    .attr("dy", "1em")
+    .style("text-anchor", "middle")
+    .text("Features")
+  svg2.append("text").attr("id", "title").attr("transform", "translate("+(width/2)+","+(margin-30) +")").style("text-anchor", "middle").text("Feature Importance")
 }
 
 </script>
